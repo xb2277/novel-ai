@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-bg: #FFFFFF;
+    --color-surface: #ffffff;
+    --color-border: #e5e0d8;
+    --color-text: #2c2c2a;
+    --color-text-secondary: #6b6b66;
+    --color-accent: #7c6ff7;
+    --color-accent-light: #edeafd;
+    --color-success: #3b8200;
+    --color-warning: #c27a00;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", Georgia, "Times New Roman", serif;
+  }
+
+  .font-ui {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+  }
+}
+
+@layer components {
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-ghost:hover {
+    background: var(--color-accent-light);
+    color: var(--color-accent);
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #fff;
+    background: var(--color-accent);
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary:hover {
+    opacity: 0.9;
+  }
+  .btn-primary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+}
