@@ -1,46 +1,62 @@
-import type { Settings, OutlineNode, Chapter, Conversation } from './types'
+import type { Settings, Novel } from './types'
+import { createDefaultNovel } from './defaults'
 
 // ===== Persistence =====
 
 const SAVE_KEY = 'novel-ai-project'
 const SETTINGS_KEY = 'novel-ai-settings'
+const MIGRATED_KEY = 'novel-ai-migrated'
 
-export function loadProject(): {
-  novelTitle: string
-  novelIntro: string
-  outlines: OutlineNode[]
-  chapters: Chapter[]
-  currentChapterId: string | null
-  conversations: Conversation[]
-  activeConversationId: string | null
-} | null {
+function isLegacyFormat(data: Record<string, unknown>): boolean {
+  return typeof data.novelTitle === 'string' && !Array.isArray(data.novels)
+}
+
+/** Convert old flat-book format to multi-novel array */
+function migrateLegacy(data: Record<string, unknown>): {
+  novels: Novel[]
+  currentNovelId: string
+} {
+  const novel = createDefaultNovel('未命名作品')
+  novel.title = (data.novelTitle as string) || novel.title
+  novel.intro = (data.novelIntro as string) || ''
+  novel.outlines = (data.outlines as Novel['outlines']) || novel.outlines
+  novel.chapters = (data.chapters as Novel['chapters']) || novel.chapters
+  novel.currentChapterId = (data.currentChapterId as string) || novel.currentChapterId
+  novel.conversations = (data.conversations as Novel['conversations']) || novel.conversations
+  novel.activeConversationId = (data.activeConversationId as string) || novel.activeConversationId
+  return { novels: [novel], currentNovelId: novel.id }
+}
+
+export interface SavedProject {
+  novels: Novel[]
+  currentNovelId: string | null
+}
+
+export function loadProject(): SavedProject | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY)
     if (!raw) return null
-    return JSON.parse(raw)
+    const data = JSON.parse(raw)
+
+    if (isLegacyFormat(data)) {
+      const migrated = migrateLegacy(data)
+      // Save migrated format back immediately
+      localStorage.setItem(SAVE_KEY, JSON.stringify(migrated))
+      localStorage.setItem(MIGRATED_KEY, 'true')
+      return migrated
+    }
+
+    return data as SavedProject
   } catch {
     return null
   }
 }
 
-export function saveProject(state: {
-  novelTitle: string
-  novelIntro: string
-  outlines: OutlineNode[]
-  chapters: Chapter[]
-  currentChapterId: string | null
-  conversations: Conversation[]
-  activeConversationId: string | null
-}) {
+export function saveProject(state: SavedProject) {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify({
-      novelTitle: state.novelTitle,
-      novelIntro: state.novelIntro,
-      outlines: state.outlines,
-      chapters: state.chapters,
-      currentChapterId: state.currentChapterId,
-      conversations: state.conversations,
-      activeConversationId: state.activeConversationId,
+      novels: state.novels,
+      currentNovelId: state.currentNovelId,
     }))
   } catch { /* quota exceeded */ }
 }

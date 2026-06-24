@@ -4,6 +4,7 @@ import Editor from './components/Editor'
 import AiChatDialog from './components/AiChatDialog'
 import SettingsMenu from './components/SettingsMenu'
 import LeftSidebar from './components/LeftSidebar'
+import NovelSwitcher from './components/NovelSwitcher'
 import { MenuIcon, SettingsIcon, PanelIcon } from './components/icons'
 
 export default function App() {
@@ -48,6 +49,7 @@ export default function App() {
             <span className="hidden sm:inline">设置</span>
           </button>
           {showSettings && <SettingsMenu onClose={() => setShowSettings(false)} />}
+          <NovelSwitcher />
           <button
             onClick={toggleSidePanel}
             className={`btn-ghost text-xs ${sidePanelOpen ? '!bg-[var(--color-accent-light)] !text-[var(--color-accent)]' : ''}`}

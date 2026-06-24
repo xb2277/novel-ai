@@ -1,46 +1,144 @@
 import { create } from 'zustand'
 import { v4 as uuidv4 } from 'uuid'
 import { getNextChapterTitle } from '../services/chapterNumber'
-import type { AppState, Chapter, ChatMessage, Conversation, OutlineNode, Settings, Suggestion } from './types'
+import type { AppState, Chapter, ChatMessage, Conversation, Novel, OutlineNode, Settings, Suggestion } from './types'
 import { countChinese } from './types'
-import { loadProject, saveProject, loadSettings, saveSettings } from './persistence'
+import { loadProject, saveProject, loadSettings, saveSettings, type SavedProject } from './persistence'
 import { addToParent, findAndRemove, findAndToggle, findAndUpdate } from './outlineHelpers'
-import { createDefaultProject } from './defaults'
+import { createDefaultNovel, createDefaultProject } from './defaults'
 
 // Re-export types and helpers for consumers
-export type { AppState, Chapter, ChatMessage, Conversation, OutlineNode, Settings, Suggestion }
+export type { AppState, Chapter, ChatMessage, Conversation, Novel, OutlineNode, Settings, Suggestion, SavedProject }
 export { countChinese, BG_COLOR_PRESETS } from './types'
 export { loadProject, saveProject, loadSettings, saveSettings } from './persistence'
 export { findInTree, addToParent, findAndUpdate, findAndRemove, findAndToggle } from './outlineHelpers'
-export { createDefaultChapter, createDefaultProject, createDefaultConversation, createDefaultOutlines } from './defaults'
+export { createDefaultChapter, createDefaultNovel, createDefaultOutlines } from './defaults'
 
-// ===== Store =====
+// ===== Persist helper =====
+
+/** Inject current flat fields into novels array and write to localStorage. */
+function persistNovel(get: () => AppState) {
+  const s = get()
+  const now = new Date().toISOString()
+  const novels = s.novels.map((n) => {
+    if (n.id !== s.currentNovelId) return n
+    return {
+      ...n,
+      title: s.novelTitle,
+      intro: s.novelIntro,
+      outlines: s.outlines,
+      chapters: s.chapters,
+      currentChapterId: s.currentChapterId,
+      conversations: s.conversations,
+      activeConversationId: s.activeConversationId,
+      updatedAt: now,
+    }
+  })
+  saveProject({ novels, currentNovelId: s.currentNovelId })
+}
+
+/** Build flat fields from a Novel object. */
+function loadNovelIntoFlat(novel: Novel) {
+  return {
+    novelTitle: novel.title,
+    novelIntro: novel.intro,
+    outlines: novel.outlines,
+    chapters: novel.chapters,
+    currentChapterId: novel.currentChapterId,
+    conversations: novel.conversations,
+    activeConversationId: novel.activeConversationId,
+  }
+}
+
+// ===== Initialization =====
 
 const saved = loadProject()
 const initial = saved || createDefaultProject()
+const firstNovel = initial.novels.find((n) => n.id === initial.currentNovelId) || initial.novels[0]
+const flatFromNovel = firstNovel
+  ? loadNovelIntoFlat(firstNovel)
+  : loadNovelIntoFlat(createDefaultNovel())
+
+// ===== Store =====
 
 export const useStore = create<AppState>((set, get) => ({
-  // Initial state
+  // Flat current-novel fields (mirrored from novels[currentNovelId])
+  ...flatFromNovel,
+
+  // Selection
   selectedText: '',
   suggestions: [],
   isLoading: false,
   settings: loadSettings(),
+
+  // UI state
   sidePanelOpen: false,
   leftPanelOpen: true,
   referenceOpen: false,
   selectedOutlineNodeId: null,
   autoObserve: false,
 
-  novelTitle: initial.novelTitle,
-  novelIntro: initial.novelIntro,
-  outlines: initial.outlines,
-  chapters: initial.chapters,
-  currentChapterId: initial.currentChapterId,
+  // Multi-novel
+  novels: initial.novels.length > 0 ? initial.novels : [createDefaultNovel()],
+  currentNovelId: initial.currentNovelId ?? initial.novels[0]?.id ?? null,
 
-  conversations: initial.conversations ?? [],
-  activeConversationId: initial.activeConversationId ?? null,
+  // ===== Novel management =====
 
-  // Actions
+  createNovel: (title = '未命名作品') => {
+    const novel = createDefaultNovel(title)
+    set((state) => {
+      const novels = [...state.novels, novel]
+      saveProject({ novels, currentNovelId: novel.id })
+      return { novels, currentNovelId: novel.id, ...loadNovelIntoFlat(novel) }
+    })
+    return novel
+  },
+
+  deleteNovel: (id) =>
+    set((state) => {
+      const novels = state.novels.filter((n) => n.id !== id)
+      let currentNovelId = state.currentNovelId
+
+      if (state.currentNovelId === id) {
+        const targetNovel = novels[novels.length - 1]
+        currentNovelId = targetNovel?.id ?? null
+        if (targetNovel) {
+          saveProject({ novels, currentNovelId })
+          return { novels, currentNovelId, ...loadNovelIntoFlat(targetNovel) }
+        }
+        saveProject({ novels, currentNovelId: null })
+        return { novels, currentNovelId: null }
+      }
+
+      saveProject({ novels, currentNovelId })
+      return { novels }
+    }),
+
+  switchToNovel: (id) => {
+    persistNovel(get)
+    const novel = get().novels.find((n) => n.id === id)
+    if (!novel) return
+    set({
+      currentNovelId: id,
+      ...loadNovelIntoFlat(novel),
+    })
+    saveProject({ novels: get().novels, currentNovelId: id })
+  },
+
+  renameNovel: (id, title) =>
+    set((state) => {
+      const novels = state.novels.map((n) =>
+        n.id === id ? { ...n, title, updatedAt: new Date().toISOString() } : n
+      )
+      saveProject({ novels, currentNovelId: state.currentNovelId })
+      if (id === state.currentNovelId) {
+        return { novels, novelTitle: title }
+      }
+      return { novels }
+    }),
+
+  // ===== Per-novel actions =====
+
   setSelectedText: (text) => set({ selectedText: text }),
   setSuggestions: (suggestions) => set({ suggestions }),
   clearSuggestions: () => set({ suggestions: [], selectedText: '' }),
@@ -52,56 +150,46 @@ export const useStore = create<AppState>((set, get) => ({
     set({ settings: updated })
   },
 
-  toggleSidePanel: () => set((state) => ({ sidePanelOpen: !state.sidePanelOpen })),
+  toggleSidePanel: () => set((s) => ({ sidePanelOpen: !s.sidePanelOpen })),
   setSidePanelOpen: (open) => set({ sidePanelOpen: open }),
-  toggleLeftPanel: () => set((state) => ({ leftPanelOpen: !state.leftPanelOpen })),
-  toggleReference: () => set((state) => ({ referenceOpen: !state.referenceOpen })),
+  toggleLeftPanel: () => set((s) => ({ leftPanelOpen: !s.leftPanelOpen })),
+  toggleReference: () => set((s) => ({ referenceOpen: !s.referenceOpen })),
   setReferenceOpen: (open) => set({ referenceOpen: open }),
   setSelectedOutlineNodeId: (id) => set({ selectedOutlineNodeId: id }),
   setAutoObserve: (on) => set({ autoObserve: on }),
 
   setNovelTitle: (title) => {
     set({ novelTitle: title })
-    saveProject({ ...get(), novelTitle: title })
+    persistNovel(get)
   },
-
   setNovelIntro: (intro) => {
     set({ novelIntro: intro })
-    saveProject({ ...get(), novelIntro: intro })
+    persistNovel(get)
   },
-
   setOutlines: (outlines) => {
     set({ outlines })
-    saveProject({ ...get(), outlines })
+    persistNovel(get)
   },
 
-  addOutlineNode: (parentId, node) =>
-    set((state) => {
-      const outlines = addToParent(state.outlines, parentId, node)
-      saveProject({ ...state, outlines })
-      return { outlines }
-    }),
+  addOutlineNode: (parentId, node) => {
+    set((state) => ({ outlines: addToParent(state.outlines, parentId, node) }))
+    persistNovel(get)
+  },
 
-  updateOutlineNode: (id, updates) =>
-    set((state) => {
-      const outlines = findAndUpdate(state.outlines, id, updates)
-      saveProject({ ...state, outlines })
-      return { outlines }
-    }),
+  updateOutlineNode: (id, updates) => {
+    set((state) => ({ outlines: findAndUpdate(state.outlines, id, updates) }))
+    persistNovel(get)
+  },
 
-  removeOutlineNode: (id) =>
-    set((state) => {
-      const outlines = findAndRemove(state.outlines, id)
-      saveProject({ ...state, outlines })
-      return { outlines }
-    }),
+  removeOutlineNode: (id) => {
+    set((state) => ({ outlines: findAndRemove(state.outlines, id) }))
+    persistNovel(get)
+  },
 
-  toggleOutlineNode: (id) =>
-    set((state) => {
-      const outlines = findAndToggle(state.outlines, id)
-      saveProject({ ...state, outlines })
-      return { outlines }
-    }),
+  toggleOutlineNode: (id) => {
+    set((state) => ({ outlines: findAndToggle(state.outlines, id) }))
+    persistNovel(get)
+  },
 
   addChapter: (partial) => {
     let chapter: Chapter | null = null
@@ -117,37 +205,36 @@ export const useStore = create<AppState>((set, get) => ({
         ...partial,
       }
       const chapters = [...state.chapters, chapter]
-      const newState = { chapters, currentChapterId: chapter.id }
-      saveProject({ ...state, ...newState })
-      return newState
+      return { chapters, currentChapterId: chapter.id }
     })
+    persistNovel(get)
     return chapter!
   },
 
-  updateChapter: (id, updates) =>
-    set((state) => {
-      const chapters = state.chapters.map((ch) =>
+  updateChapter: (id, updates) => {
+    set((state) => ({
+      chapters: state.chapters.map((ch) =>
         ch.id === id ? { ...ch, ...updates, updatedAt: new Date().toISOString() } : ch
-      )
-      saveProject({ ...state, chapters })
-      return { chapters }
-    }),
+      ),
+    }))
+    persistNovel(get)
+  },
 
-  removeChapter: (id) =>
+  removeChapter: (id) => {
     set((state) => {
       const chapters = state.chapters.filter((ch) => ch.id !== id)
       const currentChapterId =
         state.currentChapterId === id
           ? chapters[chapters.length - 1]?.id || null
           : state.currentChapterId
-      const newState = { chapters, currentChapterId }
-      saveProject({ ...state, ...newState })
-      return newState
-    }),
+      return { chapters, currentChapterId }
+    })
+    persistNovel(get)
+  },
 
   setCurrentChapter: (id) => {
     set({ currentChapterId: id })
-    saveProject({ ...get(), currentChapterId: id })
+    persistNovel(get)
   },
 
   getCurrentChapter: () => {
@@ -155,26 +242,25 @@ export const useStore = create<AppState>((set, get) => ({
     return chapters.find((ch) => ch.id === currentChapterId)
   },
 
-  recalcChapterWordCount: (id) =>
-    set((state) => {
-      const chapters = state.chapters.map((ch) =>
+  recalcChapterWordCount: (id) => {
+    set((state) => ({
+      chapters: state.chapters.map((ch) =>
         ch.id === id ? { ...ch, wordCount: countChinese(ch.content) } : ch
-      )
-      saveProject({ ...state, chapters })
-      return { chapters }
-    }),
+      ),
+    }))
+    persistNovel(get)
+  },
 
-  /** Atomic save: update content + recalc word count in one operation */
-  saveChapterContent: (id, content) =>
-    set((state) => {
-      const chapters = state.chapters.map((ch) =>
+  saveChapterContent: (id, content) => {
+    set((state) => ({
+      chapters: state.chapters.map((ch) =>
         ch.id === id
           ? { ...ch, content, wordCount: countChinese(content), updatedAt: new Date().toISOString() }
           : ch
-      )
-      saveProject({ ...state, chapters })
-      return { chapters }
-    }),
+      ),
+    }))
+    persistNovel(get)
+  },
 
   // ===== Conversation actions =====
 
@@ -187,45 +273,46 @@ export const useStore = create<AppState>((set, get) => ({
     }
     set((state) => {
       const conversations = [...state.conversations, conv]
-      saveProject({ ...state, conversations, activeConversationId: conv.id })
       return { conversations, activeConversationId: conv.id }
     })
+    persistNovel(get)
     return conv
   },
 
-  deleteConversation: (id) =>
+  deleteConversation: (id) => {
     set((state) => {
       const conversations = state.conversations.filter((c) => c.id !== id)
       const activeConversationId =
         state.activeConversationId === id
           ? conversations[conversations.length - 1]?.id ?? null
           : state.activeConversationId
-      saveProject({ ...state, conversations, activeConversationId })
       return { conversations, activeConversationId }
-    }),
+    })
+    persistNovel(get)
+  },
 
   setActiveConversation: (id) => {
     set({ activeConversationId: id })
-    saveProject({ ...get(), activeConversationId: id })
+    persistNovel(get)
   },
 
-  addMessage: (conversationId, message) =>
-    set((state) => {
-      const conversations = state.conversations.map((c) =>
+  addMessage: (conversationId, message) => {
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
         c.id === conversationId
           ? { ...c, messages: [...c.messages, message] }
           : c
-      )
-      saveProject({ ...state, conversations })
-      return { conversations }
-    }),
+      ),
+    }))
+    persistNovel(get)
+  },
 
-  updateConversationTitle: (id, title) =>
-    set((state) => {
-      const conversations = state.conversations.map((c) =>
+  updateConversationTitle: (id, title) => {
+    set((state) => ({
+      conversations: state.conversations.map((c) =>
         c.id === id ? { ...c, title } : c
-      )
-      saveProject({ ...state, conversations })
-      return { conversations }
-    }),
+      ),
+    }))
+    persistNovel(get)
+  },
 }))

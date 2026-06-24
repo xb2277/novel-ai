@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import type { OutlineNode, Chapter, Conversation } from './types'
+import type { OutlineNode, Chapter, Conversation, Novel } from './types'
 
 // ===== Defaults =====
 
@@ -69,16 +69,28 @@ export function createDefaultOutlines(): OutlineNode[] {
   ]
 }
 
-export function createDefaultProject() {
+export function createDefaultNovel(title = '未命名作品'): Novel {
+  const now = new Date().toISOString()
   const ch1 = createDefaultChapter()
   const conv = createDefaultConversation()
   return {
-    novelTitle: '未命名作品',
-    novelIntro: '',
+    id: uuidv4(),
+    title,
+    intro: '',
     outlines: createDefaultOutlines(),
     chapters: [ch1],
     currentChapterId: ch1.id,
     conversations: [conv],
     activeConversationId: conv.id,
+    createdAt: now,
+    updatedAt: now,
+  }
+}
+
+export function createDefaultProject() {
+  const novel = createDefaultNovel()
+  return {
+    novels: [novel],
+    currentNovelId: novel.id,
   }
 }

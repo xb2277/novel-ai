@@ -52,6 +52,19 @@ export interface Conversation {
   createdAt: string
 }
 
+export interface Novel {
+  id: string
+  title: string
+  intro: string
+  outlines: OutlineNode[]
+  chapters: Chapter[]
+  currentChapterId: string | null
+  conversations: Conversation[]
+  activeConversationId: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export function countChinese(text: string): number {
   const html = text.replace(/<[^>]*>/g, '')
   const str = html.replace(/\s+/g, '')
@@ -61,7 +74,18 @@ export function countChinese(text: string): number {
 
 // ===== Store Interface =====
 
-export interface AppState {
+/** Computed view of current novel fields for easy selector access */
+export interface CurrentNovelView {
+  novelTitle: string
+  novelIntro: string
+  outlines: OutlineNode[]
+  chapters: Chapter[]
+  currentChapterId: string | null
+  conversations: Conversation[]
+  activeConversationId: string | null
+}
+
+export interface AppState extends CurrentNovelView {
   // Selection
   selectedText: string
   suggestions: Suggestion[]
@@ -75,18 +99,17 @@ export interface AppState {
   selectedOutlineNodeId: string | null
   autoObserve: boolean
 
-  // Project data
-  novelTitle: string
-  novelIntro: string
-  outlines: OutlineNode[]
-  chapters: Chapter[]
-  currentChapterId: string | null
+  // Multi-novel
+  novels: Novel[]
+  currentNovelId: string | null
 
-  // Conversation
-  conversations: Conversation[]
-  activeConversationId: string | null
+  // Novel management actions
+  createNovel: (title?: string) => Novel
+  deleteNovel: (id: string) => void
+  switchToNovel: (id: string) => void
+  renameNovel: (id: string, title: string) => void
 
-  // Actions
+  // Per-novel actions (operate on current novel)
   setSelectedText: (text: string) => void
   setSuggestions: (suggestions: Suggestion[]) => void
   clearSuggestions: () => void
@@ -117,7 +140,7 @@ export interface AppState {
   recalcChapterWordCount: (id: string) => void
   saveChapterContent: (id: string, content: string) => void
 
-  // Conversation actions
+  // Conversation actions (operate on current novel)
   createConversation: (title?: string) => Conversation
   deleteConversation: (id: string) => void
   setActiveConversation: (id: string) => void
