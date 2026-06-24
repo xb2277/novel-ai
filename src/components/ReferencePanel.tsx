@@ -17,6 +17,7 @@ export default function ReferencePanel() {
   const selectedId = useStore((s) => s.selectedOutlineNodeId)
   const toggleReference = useStore((s) => s.toggleReference)
   const updateOutlineNode = useStore((s) => s.updateOutlineNode)
+  const setNovelTitle = useStore((s) => s.setNovelTitle)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -43,8 +44,12 @@ export default function ReferencePanel() {
   const handleSave = useCallback(() => {
     if (!node || !selectedId) return
     updateOutlineNode(selectedId, { content: draft })
+    // 如果编辑的是"书名"节点，同步更新书架上的小说标题
+    if (node.title === '书名' && draft.trim()) {
+      setNovelTitle(draft.trim())
+    }
     setEditing(false)
-  }, [node, selectedId, draft, updateOutlineNode])
+  }, [node, selectedId, draft, updateOutlineNode, setNovelTitle])
 
   const handleCancel = useCallback(() => {
     setDraft(node?.content || '')
