@@ -30,13 +30,11 @@ export async function fetchAllNovels() {
 }
 
 export async function fetchUserNovels(userId: string) {
-  // 如果查的是当前用户，先把本地未同步的小说推上去
+  // 如果查的是当前用户，先把本地小说推上去（等推送完成）
   const me = useAuthStore.getState().user
   if (me && me.id === userId) {
     const localNovels = useStore.getState().novels
-    for (const n of localNovels) {
-      pushNovel(n).catch(() => {})
-    }
+    await Promise.allSettled(localNovels.map((n) => pushNovel(n)))
   }
 
   const { data, error } = await supabase
