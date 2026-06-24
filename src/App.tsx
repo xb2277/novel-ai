@@ -5,6 +5,7 @@ import AiChatDialog from './components/AiChatDialog'
 import SettingsMenu from './components/SettingsMenu'
 import LeftSidebar from './components/LeftSidebar'
 import NovelSwitcher from './components/NovelSwitcher'
+import UserMenu from './components/UserMenu'
 import { MenuIcon, SettingsIcon, PanelIcon } from './components/icons'
 
 export default function App() {
@@ -41,6 +42,7 @@ export default function App() {
           </span>
         </div>
         <div className="flex items-center gap-1 relative">
+          <UserMenu />
           <button
             onClick={() => setShowSettings(!showSettings)}
             className={`btn-ghost text-xs ${showSettings ? '!bg-[var(--color-accent-light)] !text-[var(--color-accent)]' : ''}`}

@@ -170,7 +170,14 @@ export default function SettingsMenu({ onClose }: { onClose: () => void }) {
 
             {/* 保存按钮 */}
             <div className="flex items-center justify-between pt-1">
-              <span className="text-[10px] text-[var(--color-text-secondary)]">Key 仅保存在本地</span>
+              <span className="text-[10px] text-[var(--color-text-secondary)]/60 flex items-center gap-1">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0110 0v4" />
+                  <circle cx="12" cy="16" r="1" />
+                </svg>
+                Key 仅保存在本地，多设备需重新设置
+              </span>
               <button onClick={handleSaveApi} className="btn-primary text-xs py-1.5 px-3">
                 {saved ? '已保存' : '保存'}
               </button>

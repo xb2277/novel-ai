@@ -6,6 +6,8 @@ import { countChinese } from './types'
 import { loadProject, saveProject, loadSettings, saveSettings, type SavedProject } from './persistence'
 import { addToParent, findAndRemove, findAndToggle, findAndUpdate } from './outlineHelpers'
 import { createDefaultNovel, createDefaultProject } from './defaults'
+import { useAuthStore } from './authStore'
+import { pullNovels, pushNovel, deleteNovelRemote } from '../services/syncService'
 
 // Re-export types and helpers for consumers
 export type { AppState, Chapter, ChatMessage, Conversation, Novel, OutlineNode, Settings, Suggestion, SavedProject }
@@ -35,6 +37,7 @@ function persistNovel(get: () => AppState) {
     }
   })
   saveProject({ novels, currentNovelId: s.currentNovelId })
+  scheduleCloudSync()
 }
 
 /** Build flat fields from a Novel object. */
@@ -94,8 +97,12 @@ export const useStore = create<AppState>((set, get) => ({
     return novel
   },
 
-  deleteNovel: (id) =>
-    set((state) => {
+  deleteNovel: (id) => {
+    // Fire-and-forget remote delete if logged in
+    if (useAuthStore.getState().user) {
+      deleteNovelRemote(id).catch(() => {})
+    }
+    return set((state) => {
       const novels = state.novels.filter((n) => n.id !== id)
       let currentNovelId = state.currentNovelId
 
@@ -112,7 +119,8 @@ export const useStore = create<AppState>((set, get) => ({
 
       saveProject({ novels, currentNovelId })
       return { novels }
-    }),
+    })
+  },
 
   switchToNovel: (id) => {
     persistNovel(get)
@@ -316,3 +324,76 @@ export const useStore = create<AppState>((set, get) => ({
     persistNovel(get)
   },
 }))
+
+// ===== Cloud sync integration =====
+
+// Debounced cloud sync helper
+let cloudSyncTimer: ReturnType<typeof setTimeout>
+function scheduleCloudSync() {
+  if (!useAuthStore.getState().user) return
+  clearTimeout(cloudSyncTimer)
+  cloudSyncTimer = setTimeout(() => {
+    const s = useStore.getState()
+    const novel = s.novels.find((n) => n.id === s.currentNovelId)
+    if (novel) {
+      const now = new Date().toISOString()
+      const snap = {
+        ...novel,
+        title: s.novelTitle,
+        intro: s.novelIntro,
+        outlines: s.outlines,
+        chapters: s.chapters,
+        currentChapterId: s.currentChapterId,
+        conversations: s.conversations,
+        activeConversationId: s.activeConversationId,
+        updatedAt: now,
+      }
+      pushNovel(snap).catch(() => {})
+    }
+  }, 3000)
+}
+
+// Auth state listener: pull on login, push local if first time
+let lastUserId: string | null = null
+useAuthStore.subscribe((state) => {
+  const currentId = state.user?.id ?? null
+
+  if (currentId && currentId !== lastUserId) {
+    lastUserId = currentId
+    pullNovels().then((cloudNovels) => {
+      if (cloudNovels.length === 0) {
+        // First login — push local novels to cloud
+        const localNovels = useStore.getState().novels
+        localNovels.forEach((n) => pushNovel(n).catch(() => {}))
+        return
+      }
+      // Merge cloud wins, preserve local conversations
+      const localNovels = useStore.getState().novels
+      const merged = cloudNovels.map((cn) => {
+        const local = localNovels.find((ln) => ln.id === cn.id)
+        if (local) {
+          cn.conversations = local.conversations
+          cn.activeConversationId = local.activeConversationId
+        }
+        return cn
+      })
+      useStore.setState({
+        novels: merged,
+        currentNovelId: merged[0]?.id ?? null,
+        ...(merged[0] ? {
+          novelTitle: merged[0].title,
+          novelIntro: merged[0].intro,
+          outlines: merged[0].outlines,
+          chapters: merged[0].chapters,
+          currentChapterId: merged[0].currentChapterId,
+          conversations: merged[0].conversations,
+          activeConversationId: merged[0].activeConversationId,
+        } : {}),
+      })
+    }).catch(() => {})
+  }
+
+  if (!currentId) {
+    lastUserId = null
+  }
+})
