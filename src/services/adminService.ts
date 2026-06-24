@@ -1,5 +1,4 @@
 import { supabase } from './supabase'
-import { pushNovel } from './syncService'
 import { useStore } from '../stores/useStore'
 import { useAuthStore } from '../stores/authStore'
 
@@ -29,12 +28,41 @@ export async function fetchAllNovels() {
   return data
 }
 
+async function quickSyncLocalNovels(userId: string) {
+  const novels = useStore.getState().novels
+  const now = new Date().toISOString()
+  for (const n of novels) {
+    // 只同步小说基本信息（章节和大纲稍后由 persistNovel 处理）
+    await supabase.from('novels').upsert({
+      id: n.id, user_id: userId, title: n.title,
+      intro: n.intro, current_chapter_id: n.currentChapterId,
+      updated_at: now,
+    }, { onConflict: 'id' }).then(({ error }) => {
+      if (error) console.warn('quick sync novel upsert:', error.message)
+    })
+    // 同步章节
+    if (n.chapters.length > 0) {
+      const rows = n.chapters.map((c, i) => ({
+        id: c.id, novel_id: n.id, title: c.title,
+        content: c.content, word_count: c.wordCount, sort_order: i,
+        updated_at: now,
+      }))
+      await supabase.from('chapters').upsert(rows, { onConflict: 'id' }).then(({ error }) => {
+        if (error) console.warn('quick sync chapters upsert:', error.message)
+      })
+    }
+  }
+}
+
 export async function fetchUserNovels(userId: string) {
-  // 如果查的是当前用户，先把本地小说推上去（等推送完成）
+  // 如果查的是当前用户，先同步本地数据到云端
   const me = useAuthStore.getState().user
   if (me && me.id === userId) {
-    const localNovels = useStore.getState().novels
-    await Promise.allSettled(localNovels.map((n) => pushNovel(n)))
+    try {
+      await quickSyncLocalNovels(userId)
+    } catch (e) {
+      console.warn('quick sync failed:', e)
+    }
   }
 
   const { data, error } = await supabase
