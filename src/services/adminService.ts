@@ -32,23 +32,32 @@ async function quickSyncLocalNovels(userId: string) {
   const novels = useStore.getState().novels
   const now = new Date().toISOString()
   for (const n of novels) {
-    // 1. 先插章节（因为 novel 的 current_chapter_id 外键依赖章节）
+    // 三步走避开 FK + RLS 互相死锁
+    // 1. 先插小说（不带 current_chapter_id，避免 FK 找不到章节）
+    const { error: e1 } = await supabase.from('novels').upsert({
+      id: n.id, user_id: userId, title: n.title,
+      intro: n.intro, updated_at: now,
+    }, { onConflict: 'id' })
+    if (e1) { console.warn('sync novel:', e1.message); continue }
+
+    // 2. 插章节（此时小说已存在，RLS 通过）
     if (n.chapters.length > 0) {
       const rows = n.chapters.map((c, i) => ({
         id: c.id, novel_id: n.id, title: c.title,
         content: c.content, word_count: c.wordCount, sort_order: i,
         updated_at: now,
       }))
-      const { error: chErr } = await supabase.from('chapters').upsert(rows, { onConflict: 'id' })
-      if (chErr) console.warn('sync chapters:', chErr.message)
+      const { error: e2 } = await supabase.from('chapters').upsert(rows, { onConflict: 'id' })
+      if (e2) console.warn('sync chapters:', e2.message)
     }
-    // 2. 再插小说
-    const { error: novErr } = await supabase.from('novels').upsert({
-      id: n.id, user_id: userId, title: n.title,
-      intro: n.intro, current_chapter_id: n.currentChapterId,
-      updated_at: now,
-    }, { onConflict: 'id' })
-    if (novErr) console.warn('sync novel:', novErr.message)
+
+    // 3. 回填 current_chapter_id
+    if (n.currentChapterId) {
+      const { error: e3 } = await supabase.from('novels').update({
+        current_chapter_id: n.currentChapterId, updated_at: now,
+      }).eq('id', n.id)
+      if (e3) console.warn('sync novel FK:', e3.message)
+    }
   }
 }
 
