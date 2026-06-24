@@ -1,4 +1,7 @@
 import { supabase } from './supabase'
+import { pushNovel } from './syncService'
+import { useStore } from '../stores/useStore'
+import { useAuthStore } from '../stores/authStore'
 
 export async function fetchAllUsers() {
   const { data, error } = await supabase
@@ -27,6 +30,15 @@ export async function fetchAllNovels() {
 }
 
 export async function fetchUserNovels(userId: string) {
+  // 如果查的是当前用户，先把本地未同步的小说推上去
+  const me = useAuthStore.getState().user
+  if (me && me.id === userId) {
+    const localNovels = useStore.getState().novels
+    for (const n of localNovels) {
+      pushNovel(n).catch(() => {})
+    }
+  }
+
   const { data, error } = await supabase
     .from('novels')
     .select('*, chapters:chapters!novel_id(id, word_count)')

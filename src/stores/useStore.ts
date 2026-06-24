@@ -94,6 +94,7 @@ export const useStore = create<AppState>((set, get) => ({
       saveProject({ novels, currentNovelId: novel.id })
       return { novels, currentNovelId: novel.id, ...loadNovelIntoFlat(novel) }
     })
+    scheduleCloudSync()
     return novel
   },
 
