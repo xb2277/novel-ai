@@ -3,7 +3,7 @@ import { useAuthStore } from '../stores/authStore'
 import { fetchAllUsers, toggleUserDisabled, fetchUserNovels } from '../services/adminService'
 
 export default function AdminPage() {
-  const { user: me, isAdmin } = useAuthStore()
+  const { user: me, isAdmin, loaded } = useAuthStore()
   const [tab, setTab] = useState<'users' | 'content'>('users')
   const [users, setUsers] = useState<any[]>([])
   const [selectedUser, setSelectedUser] = useState<string | null>(null)
@@ -16,21 +16,28 @@ export default function AdminPage() {
     if (!isAdmin) return
     setLoading(true)
     fetchAllUsers()
-      .then((data) => {
-        // Find user emails from auth metadata if needed
-        setUsers(data)
-      })
+      .then((data) => { setUsers(data) })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }, [isAdmin])
 
-  // If not admin, show access denied
+  // Loading — waiting for auth state to be determined
+  if (!loaded) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen gap-3 font-ui text-[var(--color-text-secondary)]">
+        <div className="w-6 h-6 border-2 border-[var(--color-border)] border-t-[var(--color-accent)] rounded-full animate-spin" />
+        <p className="text-xs">验证权限中...</p>
+      </div>
+    )
+  }
+
+  // Not admin, not logged in
   if (!isAdmin) {
     return (
       <div className="flex flex-col items-center justify-center h-screen gap-4 font-ui text-[var(--color-text-secondary)]">
         <div className="text-4xl opacity-30">🔒</div>
-        <p className="text-sm">无访问权限</p>
-        <a href="#/" className="text-sm text-[var(--color-accent)] hover:underline">返回编辑器</a>
+        <p className="text-sm">无访问权限，请用管理员账号登录</p>
+        <a href="#/" className="text-sm text-[var(--color-accent)] hover:underline">返回编辑器登录</a>
       </div>
     )
   }
