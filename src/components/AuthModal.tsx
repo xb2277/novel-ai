@@ -54,12 +54,20 @@ export default function AuthModal({ open, onClose }: Props) {
 
     setLoading(true)
     try {
-      if (tab === 'login') {
-        await login(email.trim(), password)
-      } else {
-        await register(username.trim(), email.trim(), password)
-        await login(email.trim(), password)
-      }
+      // Wrap with timeout to prevent infinite hang
+      await Promise.race([
+        (async () => {
+          if (tab === 'login') {
+            await login(email.trim(), password)
+          } else {
+            await register(username.trim(), email.trim(), password)
+            await login(email.trim(), password)
+          }
+        })(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('请求超时，请检查网络后重试')), 15000)
+        ),
+      ])
       onClose()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '操作失败')
