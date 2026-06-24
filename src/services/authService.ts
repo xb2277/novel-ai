@@ -27,18 +27,35 @@ export async function logout(): Promise<void> {
 }
 
 async function loadUserProfile(user: User): Promise<void> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('is_admin, is_disabled')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
-  if (data?.is_disabled) {
+  if (error) {
+    console.error('loadUserProfile error:', error.message, error.code)
+  }
+
+  // If profile doesn't exist yet (trigger race), create it now
+  if (!data) {
+    const username = user.user_metadata?.username || user.email?.split('@')[0] || '用户'
+    const { error: insertErr } = await supabase
+      .from('profiles')
+      .insert({ id: user.id, username, is_admin: false })
+    if (insertErr) {
+      console.error('create profile error:', insertErr.message)
+    }
+    useAuthStore.getState().setUser(user, false)
+    return
+  }
+
+  if (data.is_disabled) {
     await supabase.auth.signOut()
     throw new Error('账号已被禁用，请联系管理员')
   }
 
-  useAuthStore.getState().setUser(user, data?.is_admin ?? false)
+  useAuthStore.getState().setUser(user, data.is_admin ?? false)
 }
 
 export async function restoreSession(): Promise<void> {
