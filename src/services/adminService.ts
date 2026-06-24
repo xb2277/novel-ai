@@ -20,7 +20,7 @@ export async function toggleUserDisabled(userId: string, disabled: boolean) {
 export async function fetchAllNovels() {
   const { data, error } = await supabase
     .from('novels')
-    .select('*, profiles:user_id(username), chapters:chapters(id)')
+    .select('*, profiles:user_id(username), chapters:chapters!novel_id(id)')
     .order('updated_at', { ascending: false })
   if (error) throw new Error(error.message)
   return data
@@ -29,7 +29,7 @@ export async function fetchAllNovels() {
 export async function fetchUserNovels(userId: string) {
   const { data, error } = await supabase
     .from('novels')
-    .select('*, chapters:chapters(id, word_count)')
+    .select('*, chapters:chapters!novel_id(id, word_count)')
     .eq('user_id', userId)
     .order('updated_at', { ascending: false })
   if (error) throw new Error(error.message)
