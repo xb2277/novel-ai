@@ -374,7 +374,7 @@ export default function Editor() {
       <div className="flex-1 min-h-0 flex flex-col">
         {/* Scrollable editor area */}
         <div className="flex-1 overflow-auto relative">
-          <div className="max-w-[720px] mx-auto px-8 pt-6 pb-12">
+          <div className="mx-auto px-8 pt-6 pb-12" style={{ maxWidth: fontSize * 45 }}>
             {/* Chapter title — editable, syncs to sidebar */}
             <div className="mb-6">
               <input
