@@ -27,6 +27,7 @@ export async function logout(): Promise<void> {
 }
 
 async function loadUserProfile(user: User): Promise<void> {
+  // Use the admin client workaround: fetch with headers
   const { data, error } = await supabase
     .from('profiles')
     .select('is_admin, is_disabled')
@@ -34,18 +35,14 @@ async function loadUserProfile(user: User): Promise<void> {
     .maybeSingle()
 
   if (error) {
-    console.error('loadUserProfile error:', error.message, error.code)
+    console.error('loadUserProfile query error:', error.message, error.code)
+    // If the profile doesn't exist, set user without admin flag
+    useAuthStore.getState().setUser(user, false)
+    return
   }
 
-  // If profile doesn't exist yet (trigger race), create it now
   if (!data) {
-    const username = user.user_metadata?.username || user.email?.split('@')[0] || '用户'
-    const { error: insertErr } = await supabase
-      .from('profiles')
-      .insert({ id: user.id, username, is_admin: false })
-    if (insertErr) {
-      console.error('create profile error:', insertErr.message)
-    }
+    console.warn('loadUserProfile: no profile found for', user.email)
     useAuthStore.getState().setUser(user, false)
     return
   }
@@ -55,6 +52,7 @@ async function loadUserProfile(user: User): Promise<void> {
     throw new Error('账号已被禁用，请联系管理员')
   }
 
+  console.log('loadUserProfile success:', { email: user.email, is_admin: data.is_admin })
   useAuthStore.getState().setUser(user, data.is_admin ?? false)
 }
 
