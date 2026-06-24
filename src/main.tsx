@@ -15,8 +15,8 @@ createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <HashRouter>
         <Routes>
+          <Route path="/" element={<App />} />
           <Route path="/admin" element={<AdminPage />} />
-          <Route path="/*" element={<App />} />
         </Routes>
       </HashRouter>
     </ErrorBoundary>

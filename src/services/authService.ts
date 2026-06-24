@@ -27,33 +27,30 @@ export async function logout(): Promise<void> {
 }
 
 async function loadUserProfile(user: User): Promise<void> {
-  // Use the admin client workaround: fetch with headers
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('is_admin, is_disabled')
-    .eq('id', user.id)
-    .maybeSingle()
+  // Use SECURITY DEFINER RPC to bypass RLS
+  const { data, error } = await supabase.rpc('get_my_profile')
 
   if (error) {
-    console.error('loadUserProfile query error:', error.message, error.code)
-    // If the profile doesn't exist, set user without admin flag
+    console.error('loadUserProfile rpc error:', error.message)
     useAuthStore.getState().setUser(user, false)
     return
   }
 
-  if (!data) {
+  // rpc returns an array, take the first row
+  const profile = Array.isArray(data) ? data[0] : data
+
+  if (!profile) {
     console.warn('loadUserProfile: no profile found for', user.email)
     useAuthStore.getState().setUser(user, false)
     return
   }
 
-  if (data.is_disabled) {
+  if (profile.is_disabled) {
     await supabase.auth.signOut()
     throw new Error('账号已被禁用，请联系管理员')
   }
 
-  console.log('loadUserProfile success:', { email: user.email, is_admin: data.is_admin })
-  useAuthStore.getState().setUser(user, data.is_admin ?? false)
+  useAuthStore.getState().setUser(user, profile.is_admin ?? false)
 }
 
 export async function restoreSession(): Promise<void> {
