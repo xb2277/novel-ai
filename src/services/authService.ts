@@ -27,20 +27,17 @@ export async function logout(): Promise<void> {
 }
 
 async function loadUserProfile(user: User): Promise<void> {
-  // Use SECURITY DEFINER RPC to bypass RLS
   const { data, error } = await supabase.rpc('get_my_profile')
 
   if (error) {
-    console.error('loadUserProfile rpc error:', error.message)
+    console.error('loadUserProfile error:', error.message)
     useAuthStore.getState().setUser(user, false)
     return
   }
 
-  // rpc returns an array, take the first row
-  const profile = Array.isArray(data) ? data[0] : data
+  const profile = Array.isArray(data) ? data[0] : null
 
   if (!profile) {
-    console.warn('loadUserProfile: no profile found for', user.email)
     useAuthStore.getState().setUser(user, false)
     return
   }
@@ -56,22 +53,8 @@ async function loadUserProfile(user: User): Promise<void> {
 export async function restoreSession(): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession()
   if (session?.user) {
-    try {
-      await loadUserProfile(session.user)
-    } catch {
-      useAuthStore.getState().clearUser()
-    }
-  }
-}
-
-// Listen for auth state changes
-supabase.auth.onAuthStateChange(async (event, session) => {
-  if (event === 'SIGNED_IN' && session?.user) {
-    try { await loadUserProfile(session.user) } catch {
-      useAuthStore.getState().clearUser()
-    }
-  }
-  if (event === 'SIGNED_OUT') {
+    await loadUserProfile(session.user)
+  } else {
     useAuthStore.getState().clearUser()
   }
-})
+}
