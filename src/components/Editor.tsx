@@ -26,6 +26,10 @@ export default function Editor() {
   const toggleReference = useStore((s) => s.toggleReference)
   const currentChapter = chapters.find((ch) => ch.id === currentChapterId)
   const [saveStatus, setSaveStatus] = useState<'saved' | 'dirty' | 'saving'>('saved')
+  const [fontSize, setFontSize] = useState(() => {
+    const saved = localStorage.getItem('editor-font-size')
+    return saved ? parseInt(saved, 10) : 16
+  })
   const [floatingPos, setFloatingPos] = useState<{ top: number; left: number } | null>(null)
   const [titleValue, setTitleValue] = useState('')
   const editorRef = useRef<HTMLDivElement>(null)
@@ -283,6 +287,32 @@ export default function Editor() {
             </span>
           </button>
         ))}
+        <div className="w-px h-4 bg-[var(--color-border)] mx-1" />
+        <button
+          onClick={() => {
+            const s = Math.max(10, fontSize - 1)
+            setFontSize(s)
+            localStorage.setItem('editor-font-size', String(s))
+          }}
+          disabled={fontSize <= 10}
+          className="btn-ghost text-sm min-w-[28px] justify-center disabled:opacity-30"
+          title="缩小字号"
+        >
+          A<sup style={{ fontSize: 9 }}>-</sup>
+        </button>
+        <span className="text-[11px] text-[var(--color-text-secondary)] min-w-[28px] text-center">{fontSize}</span>
+        <button
+          onClick={() => {
+            const s = Math.min(28, fontSize + 1)
+            setFontSize(s)
+            localStorage.setItem('editor-font-size', String(s))
+          }}
+          disabled={fontSize >= 28}
+          className="btn-ghost text-sm min-w-[28px] justify-center disabled:opacity-30"
+          title="放大字号"
+        >
+          A<sup style={{ fontSize: 12 }}>+</sup>
+        </button>
         <div className="flex-1" />
 
         {/* Save status indicator */}
@@ -362,7 +392,7 @@ export default function Editor() {
               .ProseMirror {
                 outline: none;
                 min-height: 300px;
-                font-size: 16px;
+                font-size: ${fontSize}px;
                 line-height: 1.9;
                 color: var(--color-text);
               }
