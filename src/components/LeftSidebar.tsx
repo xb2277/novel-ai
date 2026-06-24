@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useStore, type OutlineNode, type Chapter } from '../stores/useStore'
+import { useStore, findInTree, type OutlineNode, type Chapter } from '../stores/useStore'
 import { getNextChapterTitle } from '../services/chapterNumber'
 import { v4 as uuidv4 } from 'uuid'
 import { ChevronDownIcon, ChevronRightIcon, DotIcon, EditIcon, PlusIcon, TrashIcon, CheckIcon, XIcon } from './icons'
@@ -65,7 +65,7 @@ export default function LeftSidebar() {
 // ===== Outline Tree =====
 
 function OutlineTree() {
-  const { outlines, selectedOutlineNodeId, addOutlineNode, updateOutlineNode, removeOutlineNode, toggleOutlineNode, setSelectedOutlineNodeId, toggleReference } = useStore()
+  const { outlines, selectedOutlineNodeId, addOutlineNode, updateOutlineNode, removeOutlineNode, toggleOutlineNode, setSelectedOutlineNodeId, toggleReference, setNovelTitle } = useStore()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
 
@@ -76,6 +76,11 @@ function OutlineTree() {
 
   const commitEdit = (id: string) => {
     if (editTitle.trim()) {
+      // 找到被编辑的节点，判断是否是「书名」
+      const node = findInTree(outlines, id)
+      if (node && node.title === '书名') {
+        setNovelTitle(editTitle.trim())
+      }
       updateOutlineNode(id, { title: editTitle.trim() })
     }
     setEditingId(null)
