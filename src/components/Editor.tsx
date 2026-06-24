@@ -25,6 +25,7 @@ export default function Editor() {
   const referenceOpen = useStore((s) => s.referenceOpen)
   const toggleReference = useStore((s) => s.toggleReference)
   const currentChapter = chapters.find((ch) => ch.id === currentChapterId)
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'dirty' | 'saving'>('saved')
   const [floatingPos, setFloatingPos] = useState<{ top: number; left: number } | null>(null)
   const [titleValue, setTitleValue] = useState('')
   const editorRef = useRef<HTMLDivElement>(null)
@@ -73,10 +74,13 @@ export default function Editor() {
     content,
     onUpdate: ({ editor }) => {
       if (!currentChapterIdRef.current) return
+      setSaveStatus('dirty')
       clearTimeout(saveTimerRef.current)
       saveTimerRef.current = setTimeout(() => {
+        setSaveStatus('saving')
         const html = editor.getHTML()
         useStore.getState().saveChapterContent(currentChapterIdRef.current!, html)
+        setSaveStatus('saved')
       }, 800)
 
       // Schedule AI observation on content change
@@ -280,6 +284,17 @@ export default function Editor() {
           </button>
         ))}
         <div className="flex-1" />
+
+        {/* Save status indicator */}
+        <span className={`text-[11px] mr-2 transition-colors ${
+          saveStatus === 'saved' ? 'text-green-600' :
+          saveStatus === 'saving' ? 'text-[var(--color-accent)]' :
+          'text-[var(--color-text-secondary)]/50'
+        }`}>
+          {saveStatus === 'saving' ? '保存中...' :
+           saveStatus === 'saved' ? '✓ 已保存' :
+           '未保存'}
+        </span>
 
         <button
           onClick={toggleReference}
