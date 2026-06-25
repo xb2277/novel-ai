@@ -338,70 +338,87 @@ export const useStore = create<AppState>((set, get) => ({
 
 // ===== Cloud sync integration =====
 
-// Debounced cloud sync helper
+// Immediate push (no debounce) — for page unload or explicit sync
+async function pushCurrentNow() {
+  if (!useAuthStore.getState().user) return
+  const s = useStore.getState()
+  // Push ALL local novels, not just current
+  const now = new Date().toISOString()
+  for (const n of s.novels) {
+    const snap = {
+      ...n,
+      updatedAt: now,
+    }
+    pushNovel(snap).catch((e) => console.warn('push sync:', e))
+  }
+}
+
+// Debounced cloud sync (for frequent edits)
 let cloudSyncTimer: ReturnType<typeof setTimeout>
 function scheduleCloudSync() {
   if (!useAuthStore.getState().user) return
   clearTimeout(cloudSyncTimer)
-  cloudSyncTimer = setTimeout(() => {
-    const s = useStore.getState()
-    const novel = s.novels.find((n) => n.id === s.currentNovelId)
-    if (novel) {
-      const now = new Date().toISOString()
-      const snap = {
-        ...novel,
-        title: s.novelTitle,
-        intro: s.novelIntro,
-        outlines: s.outlines,
-        chapters: s.chapters,
-        currentChapterId: s.currentChapterId,
-        conversations: s.conversations,
-        activeConversationId: s.activeConversationId,
-        updatedAt: now,
-      }
-      pushNovel(snap).catch(() => {})
-    }
-  }, 3000)
+  cloudSyncTimer = setTimeout(() => pushCurrentNow(), 2000)
 }
 
-// Auth state listener: pull on login, push local if first time
+// Push on page close
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => pushCurrentNow())
+}
+
+// Pull from cloud — called on login
+async function pullAndMerge() {
+  console.log('sync: pulling from cloud...')
+  try {
+    const cloudNovels = await pullNovels()
+    console.log('sync: pulled', cloudNovels.length, 'novels')
+    const localNovels = useStore.getState().novels
+
+    if (cloudNovels.length === 0 && localNovels.length > 0) {
+      // Cloud is empty, push local
+      console.log('sync: cloud empty, pushing local...')
+      for (const n of localNovels) {
+        await pushNovel(n).catch((e) => console.warn('sync: push local failed', e))
+      }
+      return
+    }
+
+    // Merge: cloud wins, preserve local conversations
+    const merged = cloudNovels.map((cn) => {
+      const local = localNovels.find((ln) => ln.id === cn.id)
+      if (local) {
+        cn.conversations = local.conversations
+        cn.activeConversationId = local.activeConversationId
+      }
+      return cn
+    })
+    useStore.setState({
+      novels: merged,
+      currentNovelId: merged[0]?.id ?? null,
+      ...(merged[0] ? {
+        novelTitle: merged[0].title,
+        novelIntro: merged[0].intro,
+        outlines: merged[0].outlines,
+        chapters: merged[0].chapters,
+        currentChapterId: merged[0].currentChapterId,
+        conversations: merged[0].conversations,
+        activeConversationId: merged[0].activeConversationId,
+      } : {}),
+    })
+    console.log('sync: merged', merged.length, 'novels')
+  } catch (e) {
+    console.error('sync: pull failed', e)
+  }
+}
+
+// Auth state listener
 let lastUserId: string | null = null
 useAuthStore.subscribe((state) => {
   const currentId = state.user?.id ?? null
 
   if (currentId && currentId !== lastUserId) {
     lastUserId = currentId
-    pullNovels().then((cloudNovels) => {
-      if (cloudNovels.length === 0) {
-        // First login — push local novels to cloud
-        const localNovels = useStore.getState().novels
-        localNovels.forEach((n) => pushNovel(n).catch(() => {}))
-        return
-      }
-      // Merge cloud wins, preserve local conversations
-      const localNovels = useStore.getState().novels
-      const merged = cloudNovels.map((cn) => {
-        const local = localNovels.find((ln) => ln.id === cn.id)
-        if (local) {
-          cn.conversations = local.conversations
-          cn.activeConversationId = local.activeConversationId
-        }
-        return cn
-      })
-      useStore.setState({
-        novels: merged,
-        currentNovelId: merged[0]?.id ?? null,
-        ...(merged[0] ? {
-          novelTitle: merged[0].title,
-          novelIntro: merged[0].intro,
-          outlines: merged[0].outlines,
-          chapters: merged[0].chapters,
-          currentChapterId: merged[0].currentChapterId,
-          conversations: merged[0].conversations,
-          activeConversationId: merged[0].activeConversationId,
-        } : {}),
-      })
-    }).catch(() => {})
+    pullAndMerge()
   }
 
   if (!currentId) {
