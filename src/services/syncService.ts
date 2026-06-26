@@ -102,13 +102,10 @@ export async function pushNovel(novel: Novel): Promise<void> {
     if (chErr) throw new Error(chErr.message)
   }
 
-  // Push outline nodes (delete existing, then insert)
-  await supabase.from('outline_nodes').delete().eq('novel_id', novel.id)
-
-  const outlineRows = flattenOutlines(novel.outlines, novel.id, null)
-  if (outlineRows.length > 0) {
-    const { error: outErr } = await supabase.from('outline_nodes').insert(outlineRows)
-    if (outErr) throw new Error(outErr.message)
+  // Push outline nodes — upsert逐一保存，旧节点不删（数据安全第一）
+  for (const row of flattenOutlines(novel.outlines, novel.id, null)) {
+    const { error: outErr } = await supabase.from('outline_nodes').upsert(row, { onConflict: 'id' })
+    if (outErr) console.warn('sync outline:', outErr.message)
   }
 }
 
