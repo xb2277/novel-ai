@@ -236,7 +236,7 @@ export default function Editor() {
   }, [autoObserve, settings])
 
   // Debounce observation on content change (via onUpdate)
-  // We schedule a trigger after 3s of no typing
+  // Schedule a trigger after 5min of no typing
   useEffect(() => {
     if (!autoObserve) return
     // This effect reacts to autoObserve being toggled — the actual scheduling
@@ -248,7 +248,7 @@ export default function Editor() {
     clearTimeout(observeTimerRef.current)
     observeTimerRef.current = setTimeout(() => {
       triggerObservation()
-    }, 2500)
+    }, 300000)
   }, [autoObserve, triggerObservation])
 
   // Cleanup observe timer on unmount
