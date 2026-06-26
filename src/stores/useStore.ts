@@ -7,7 +7,7 @@ import { loadProject, saveProject, loadSettings, saveSettings, type SavedProject
 import { addToParent, findAndRemove, findAndToggle, findAndUpdate } from './outlineHelpers'
 import { createDefaultNovel, createDefaultProject } from './defaults'
 import { useAuthStore } from './authStore'
-import { pullNovels, pushNovel, deleteNovelRemote } from '../services/syncService'
+import { pullNovels, pushNovel, deleteNovelRemote, pushSettings, pullSettings } from '../services/syncService'
 
 // Re-export types and helpers for consumers
 export type { AppState, Chapter, ChatMessage, Conversation, Novel, OutlineNode, Settings, Suggestion, SavedProject }
@@ -157,6 +157,8 @@ export const useStore = create<AppState>((set, get) => ({
     const updated = { ...get().settings, ...partial }
     saveSettings(updated)
     set({ settings: updated })
+    // 双写云端
+    pushSettings(updated)
   },
 
   toggleSidePanel: () => set((s) => ({ sidePanelOpen: !s.sidePanelOpen })),
@@ -370,6 +372,14 @@ if (typeof window !== 'undefined') {
 async function pullAndMerge() {
   console.log('sync: pulling from cloud...')
   try {
+    // 拉取云端设置（覆盖本地）
+    const cloudSettings = await pullSettings()
+    if (cloudSettings) {
+      saveSettings(cloudSettings)
+      useStore.setState({ settings: cloudSettings })
+      console.log('sync: settings loaded from cloud')
+    }
+
     const cloudNovels = await pullNovels()
     console.log('sync: pulled', cloudNovels.length, 'novels')
     const localNovels = useStore.getState().novels

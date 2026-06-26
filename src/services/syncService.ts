@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { useAuthStore } from '../stores/authStore'
-import type { Novel, Chapter, OutlineNode } from '../stores/types'
+import type { Novel, Chapter, OutlineNode, Settings } from '../stores/types'
 
 // ===== Pull: 拉取所有用户小说 =====
 
@@ -131,4 +131,38 @@ function flattenOutlines(
 export async function deleteNovelRemote(id: string): Promise<void> {
   const { error } = await supabase.from('novels').delete().eq('id', id)
   if (error) throw new Error(error.message)
+}
+
+// ===== Settings sync =====
+
+export async function pullSettings(): Promise<Settings | null> {
+  const userId = useAuthStore.getState().user?.id
+  if (!userId) return null
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error || !data) return null
+  return {
+    apiBaseUrl: data.api_base_url,
+    apiKey: data.api_key,
+    model: data.model,
+    bgColor: data.bg_color,
+  }
+}
+
+export async function pushSettings(settings: Settings): Promise<void> {
+  const userId = useAuthStore.getState().user?.id
+  if (!userId) return
+  await supabase.from('user_settings').upsert({
+    user_id: userId,
+    api_base_url: settings.apiBaseUrl,
+    api_key: settings.apiKey,
+    model: settings.model,
+    bg_color: settings.bgColor,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'user_id' }).then(({ error }) => {
+    if (error) console.warn('sync settings:', error.message)
+  })
 }
