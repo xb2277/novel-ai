@@ -61,6 +61,8 @@ export function saveProject(state: SavedProject) {
   } catch { /* quota exceeded */ }
 }
 
+const SETTINGS_BACKUP_KEY = 'novel-ai-settings-bak'
+
 export function loadSettings(): Settings {
   const defaults: Settings = {
     apiBaseUrl: 'https://api.deepseek.com/v1',
@@ -69,12 +71,22 @@ export function loadSettings(): Settings {
     bgColor: '#FFFFFF',
   }
   try {
-    const saved = localStorage.getItem(SETTINGS_KEY)
-    if (saved) return { ...defaults, ...JSON.parse(saved) }
+    // 优先读主键，缺失则用备份键恢复
+    const saved = localStorage.getItem(SETTINGS_KEY) || localStorage.getItem(SETTINGS_BACKUP_KEY)
+    if (saved) {
+      const parsed = { ...defaults, ...JSON.parse(saved) }
+      // 恢复备份到主键
+      if (!localStorage.getItem(SETTINGS_KEY) && localStorage.getItem(SETTINGS_BACKUP_KEY)) {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(parsed))
+      }
+      return parsed
+    }
   } catch { /* ignore */ }
   return defaults
 }
 
 export function saveSettings(settings: Settings) {
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+  const json = JSON.stringify(settings)
+  localStorage.setItem(SETTINGS_KEY, json)
+  localStorage.setItem(SETTINGS_BACKUP_KEY, json)
 }
