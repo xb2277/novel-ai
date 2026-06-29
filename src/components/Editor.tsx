@@ -122,20 +122,19 @@ export default function Editor() {
     currentChapterIdRef.current = currentChapterId
   }, [currentChapterId])
 
-  // Switch chapter content; focus body after render
+  // Switch chapter content when novel or chapter changes
   useEffect(() => {
-    if (editor && currentChapter) {
-      const editorHtml = editor.getHTML()
-      const storedHtml = currentChapter.content
-      if (editorHtml !== storedHtml) {
-        editor.commands.setContent(storedHtml || '<p></p>')
-        setTimeout(() => {
-          const docSize = editor.state.doc.content.size
-          editor.commands.focus(docSize)
-        }, 30)
-      }
+    if (!editor) return
+    const storedHtml = currentChapter?.content || '<p></p>'
+    const editorHtml = editor.getHTML()
+    if (editorHtml !== storedHtml) {
+      editor.commands.setContent(storedHtml)
+      setTimeout(() => {
+        const docSize = editor.state.doc.content.size
+        editor.commands.focus(docSize)
+      }, 30)
     }
-  }, [currentChapterId])
+  }, [currentChapterId, chapters])
 
   // Autosave on unmount
   useEffect(() => {
