@@ -69,6 +69,83 @@ export default function NovelSwitcher() {
     if (novels.length <= 2) setOpen(false) // Close if last deleted
   }
 
+  const renderNovelRow = (novel: typeof novels[0]) => {
+    const isCurrent = novel.id === currentNovelId
+    const isEditing = editingId === novel.id
+    const isConfirmDelete = deletingId === novel.id
+
+    return (
+      <div key={novel.id}>
+        <div
+          onClick={() => isCurrent ? undefined : handleSwitch(novel.id)}
+          className={`flex items-center gap-2 px-3 py-[6px] text-[13px] transition-colors group ${
+            isCurrent
+              ? 'bg-[var(--color-accent-light)]/60 text-[var(--color-accent)] font-medium cursor-default'
+              : 'hover:bg-[var(--color-bg)] cursor-pointer text-[var(--color-text)]'
+          }`}
+        >
+          <BookIcon size={13} />
+
+          {isEditing ? (
+            <input
+              ref={editInputRef}
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onBlur={() => handleCommitRename(novel.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCommitRename(novel.id)
+                if (e.key === 'Escape') setEditingId(null)
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 outline-none bg-[var(--color-accent-light)]/50 px-1 rounded text-[13px] min-w-0"
+            />
+          ) : (
+            <span className="flex-1 truncate">{novel.title}</span>
+          )}
+
+          {!isEditing && !isConfirmDelete && (
+            <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <button
+                onClick={(e) => { e.stopPropagation(); handleStartRename(novel.id, novel.title) }}
+                className="p-0.5 rounded hover:bg-[var(--color-border)]/50"
+                title="重命名"
+              >
+                <EditIcon size={11} />
+              </button>
+              {novels.length > 1 && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDelete(novel.id) }}
+                  className="p-0.5 rounded hover:bg-red-50 hover:text-red-500"
+                  title="删除"
+                >
+                  <TrashIcon size={11} />
+                </button>
+              )}
+            </span>
+          )}
+
+          {isConfirmDelete && (
+            <span className="flex items-center gap-1 shrink-0 text-[11px]">
+              <span className="text-red-500">删除?</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); confirmDelete(novel.id) }}
+                className="text-green-600 hover:bg-green-50 rounded p-0.5"
+              >
+                <CheckIcon size={11} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setDeletingId(null) }}
+                className="text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/50 rounded p-0.5"
+              >
+                <XIcon size={11} />
+              </button>
+            </span>
+          )}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="relative">
       <button
@@ -91,96 +168,24 @@ export default function NovelSwitcher() {
           className="absolute right-0 top-full mt-1 w-[240px] bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] shadow-lg z-50 font-ui"
         >
           <div className="max-h-[320px] overflow-y-auto py-1">
-            {/* Current novel hint */}
+            {/* 当前小说 */}
             <div className="px-3 py-1.5 text-[11px] text-[var(--color-text-secondary)] font-medium">
               📖 当前小说
             </div>
+            {novels.filter((n) => n.id === currentNovelId).map(renderNovelRow)}
+            {novels.length === 0 && (
+              <div className="px-3 py-2 text-xs text-[var(--color-text-secondary)]">暂无小说</div>
+            )}
 
-            {novels.map((novel) => {
-              const isCurrent = novel.id === currentNovelId
-              const isEditing = editingId === novel.id
-              const isConfirmDelete = deletingId === novel.id
-
-              return (
-                <div key={novel.id}>
-                  <div
-                    onClick={() => isCurrent ? undefined : handleSwitch(novel.id)}
-                    className={`flex items-center gap-2 px-3 py-[6px] text-[13px] transition-colors group ${
-                      isCurrent
-                        ? 'bg-[var(--color-accent-light)]/60 text-[var(--color-accent)] font-medium cursor-default'
-                        : 'hover:bg-[var(--color-bg)] cursor-pointer text-[var(--color-text)]'
-                    }`}
-                  >
-                    <BookIcon size={13} />
-
-                    {isEditing ? (
-                      <input
-                        ref={editInputRef}
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        onBlur={() => handleCommitRename(novel.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleCommitRename(novel.id)
-                          if (e.key === 'Escape') setEditingId(null)
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex-1 outline-none bg-[var(--color-accent-light)]/50 px-1 rounded text-[13px] min-w-0"
-                      />
-                    ) : (
-                      <span className="flex-1 truncate">{novel.title}</span>
-                    )}
-
-                    {/* Hover actions */}
-                    {!isEditing && !isConfirmDelete && (
-                      <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleStartRename(novel.id, novel.title) }}
-                          className="p-0.5 rounded hover:bg-[var(--color-border)]/50"
-                          title="重命名"
-                        >
-                          <EditIcon size={11} />
-                        </button>
-                        {novels.length > 1 && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDelete(novel.id) }}
-                            className="p-0.5 rounded hover:bg-red-50 hover:text-red-500"
-                            title="删除"
-                          >
-                            <TrashIcon size={11} />
-                          </button>
-                        )}
-                      </span>
-                    )}
-
-                    {/* Confirm delete */}
-                    {isConfirmDelete && (
-                      <span className="flex items-center gap-1 shrink-0 text-[11px]">
-                        <span className="text-red-500">删除?</span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); confirmDelete(novel.id) }}
-                          className="text-green-600 hover:bg-green-50 rounded p-0.5"
-                        >
-                          <CheckIcon size={11} />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setDeletingId(null) }}
-                          className="text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]/50 rounded p-0.5"
-                        >
-                          <XIcon size={11} />
-                        </button>
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Other novels separator before first non-current */}
-                  {isCurrent && novels.length > 1 && (
-                    <div className="px-3 py-1.5 text-[11px] text-[var(--color-text-secondary)] font-medium mt-1">
-                      其他作品
-                    </div>
-                  )}
+            {/* 其他作品 */}
+            {novels.filter((n) => n.id !== currentNovelId).length > 0 && (
+              <>
+                <div className="px-3 py-1.5 text-[11px] text-[var(--color-text-secondary)] font-medium mt-1">
+                  其他作品
                 </div>
-              )
-            })}
+                {novels.filter((n) => n.id !== currentNovelId).map(renderNovelRow)}
+              </>
+            )}
           </div>
 
           {/* Add new */}

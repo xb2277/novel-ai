@@ -44,15 +44,30 @@ function persistNovel(get: () => AppState) {
 
 /** Build flat fields from a Novel object. */
 function loadNovelIntoFlat(novel: Novel) {
+  // Sync novel title into the "书名" outline node content
+  const outlines = syncTitleToOutline(novel.outlines, novel.title)
   return {
     novelTitle: novel.title,
     novelIntro: novel.intro,
-    outlines: novel.outlines,
+    outlines,
     chapters: novel.chapters,
     currentChapterId: novel.currentChapterId,
     conversations: novel.conversations,
     activeConversationId: novel.activeConversationId,
   }
+}
+
+/** Write novel title into the first "书名" outline node */
+function syncTitleToOutline(nodes: OutlineNode[], title: string): OutlineNode[] {
+  return nodes.map((n) => {
+    if (n.title === '书名' && n.children.length === 0) {
+      return { ...n, content: title }
+    }
+    if (n.children.length > 0) {
+      return { ...n, children: syncTitleToOutline(n.children, title) }
+    }
+    return n
+  })
 }
 
 // ===== Initialization =====
