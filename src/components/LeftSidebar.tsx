@@ -65,7 +65,7 @@ export default function LeftSidebar() {
 // ===== Outline Tree =====
 
 function OutlineTree() {
-  const { outlines, novelTitle, bookTitleNodeId, selectedOutlineNodeId, addOutlineNode, updateOutlineNode, removeOutlineNode, toggleOutlineNode, setSelectedOutlineNodeId, toggleReference, setNovelTitle } = useStore()
+  const { outlines, novelTitle, selectedOutlineNodeId, addOutlineNode, updateOutlineNode, removeOutlineNode, toggleOutlineNode, setSelectedOutlineNodeId, toggleReference, setNovelTitle } = useStore()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
 
@@ -74,10 +74,13 @@ function OutlineTree() {
     setEditTitle(node.title)
   }
 
+  const isBookTitleNode = (nodeId: string) =>
+    outlines.some((p) => p.title === '书名与简介' && p.children.length > 0 && p.children[0].id === nodeId)
+
   const commitEdit = (id: string) => {
     if (editTitle.trim()) {
-      // 用 bookTitleNodeId 稳定匹配「书名」节点（即使已重命名）
-      if (id === bookTitleNodeId) {
+      // 「书名」就是「书名与简介」下面的第一个子节点
+      if (isBookTitleNode(id)) {
         setNovelTitle(editTitle.trim())
       }
       updateOutlineNode(id, { title: editTitle.trim() })
@@ -150,7 +153,7 @@ function OutlineTree() {
             />
           ) : (
             <span className="flex-1 truncate text-[var(--color-text)]">
-              {(node.id === bookTitleNodeId || node.title === '书名') && novelTitle ? novelTitle : node.title}
+              {isBookTitleNode(node.id) && novelTitle ? novelTitle : node.title}
             </span>
           )}
 

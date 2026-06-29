@@ -50,7 +50,7 @@ function loadNovelIntoFlat(novel: Novel) {
     nodeId = findBookTitleNodeId(novel.outlines)
   }
   // Sync novel title into the "书名" outline node (title + content)
-  const outlines = syncTitleToOutline(novel.outlines, novel.title, nodeId)
+  const outlines = syncTitleToOutline(novel.outlines, novel.title)
   return {
     novelTitle: novel.title,
     novelIntro: novel.intro,
@@ -74,14 +74,16 @@ function findBookTitleNodeId(nodes: OutlineNode[]): string {
   return nodes[0]?.children?.[0]?.id ?? ''
 }
 
-/** Write novel title into the "书名" outline node (both content and title) */
-function syncTitleToOutline(nodes: OutlineNode[], title: string, nodeId?: string): OutlineNode[] {
+/** Write novel title into "书名与简介" → first child (the book title node) */
+function syncTitleToOutline(nodes: OutlineNode[], title: string): OutlineNode[] {
   return nodes.map((n) => {
-    if (n.id === nodeId || (n.title === '书名' && n.children.length === 0)) {
-      return { ...n, title, content: title }
+    if (n.title === '书名与简介' && n.children.length > 0) {
+      const updated = [...n.children]
+      updated[0] = { ...updated[0], title, content: title }
+      return { ...n, children: updated }
     }
     if (n.children.length > 0) {
-      return { ...n, children: syncTitleToOutline(n.children, title, nodeId) }
+      return { ...n, children: syncTitleToOutline(n.children, title) }
     }
     return n
   })
