@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { useAuthStore } from '../stores/authStore'
 import type { Novel, Chapter, OutlineNode, Settings } from '../stores/types'
+import { createDefaultOutlines } from '../stores/defaults'
 
 // ===== Pull: 拉取所有用户小说 =====
 
@@ -10,7 +11,7 @@ export async function pullNovels(): Promise<Novel[]> {
 
   const { data: novels, error } = await supabase
     .from('novels')
-    .select('*, chapters:chapters!novel_id(*), outline_nodes:outline_nodes!novel_id(*)')
+    .select('*, chapters:chapters!novel_id(*), outline_nodes(*)')
     .eq('user_id', userId)
     .order('created_at', { ascending: true })
 
@@ -29,7 +30,8 @@ export async function pullNovels(): Promise<Novel[]> {
         updatedAt: c.updated_at,
       }))
 
-    const outlines = buildOutlineTree(n.outline_nodes || [])
+    const rawOutline = n.outline_nodes || []
+    const outlines = rawOutline.length > 0 ? buildOutlineTree(rawOutline) : getFallbackOutlines()
 
     return {
       id: n.id,
@@ -124,6 +126,10 @@ function flattenOutlines(
     }
   })
   return rows
+}
+
+function getFallbackOutlines(): OutlineNode[] {
+  return createDefaultOutlines()
 }
 
 // ===== Delete remote novel =====
