@@ -65,7 +65,7 @@ export default function LeftSidebar() {
 // ===== Outline Tree =====
 
 function OutlineTree() {
-  const { outlines, selectedOutlineNodeId, addOutlineNode, updateOutlineNode, removeOutlineNode, toggleOutlineNode, setSelectedOutlineNodeId, toggleReference, setNovelTitle } = useStore()
+  const { outlines, novelTitle, selectedOutlineNodeId, addOutlineNode, updateOutlineNode, removeOutlineNode, toggleOutlineNode, setSelectedOutlineNodeId, toggleReference, setNovelTitle } = useStore()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
 
@@ -150,7 +150,9 @@ function OutlineTree() {
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
-            <span className="flex-1 truncate text-[var(--color-text)]">{node.title}</span>
+            <span className="flex-1 truncate text-[var(--color-text)]">
+              {node.title === '书名' && novelTitle ? novelTitle : node.title}
+            </span>
           )}
 
           <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
