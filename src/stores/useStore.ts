@@ -18,7 +18,7 @@ export { createDefaultChapter, createDefaultNovel, createDefaultOutlines } from 
 
 // ===== Persist helper =====
 
-/** Inject current flat fields into novels array and write to localStorage. */
+/** Inject current flat fields into novels array AND store + localStorage. */
 function persistNovel(get: () => AppState) {
   const s = get()
   const now = new Date().toISOString()
@@ -36,6 +36,8 @@ function persistNovel(get: () => AppState) {
       updatedAt: now,
     }
   })
+  // 同时更新 localStorage 和内存中的 novels 数组
+  useStore.setState({ novels })
   saveProject({ novels, currentNovelId: s.currentNovelId })
   scheduleCloudSync()
 }
@@ -411,20 +413,16 @@ async function pullAndMerge() {
       }
       return cn
     })
+    // 恢复到上次编辑的小说（本地记录），不存在则用第一本
+    const prevNovelId = useStore.getState().currentNovelId
+    const activeNovel = merged.find((n) => n.id === prevNovelId) || merged[0]
     useStore.setState({
       novels: merged,
-      currentNovelId: merged[0]?.id ?? null,
-      ...(merged[0] ? {
-        novelTitle: merged[0].title,
-        novelIntro: merged[0].intro,
-        outlines: merged[0].outlines,
-        chapters: merged[0].chapters,
-        currentChapterId: merged[0].currentChapterId,
-        conversations: merged[0].conversations,
-        activeConversationId: merged[0].activeConversationId,
-      } : {}),
+      currentNovelId: activeNovel?.id ?? null,
+      ...(activeNovel ? loadNovelIntoFlat(activeNovel) : {}),
     })
-    console.log('sync: merged', merged.length, 'novels')
+    saveProject({ novels: merged, currentNovelId: activeNovel?.id ?? null })
+    console.log('sync: merged', merged.length, 'novels, active:', activeNovel?.title)
     // 合并后立即推回云端，补充空数据
     for (const n of merged) {
       pushNovel(n).catch((e) => console.warn('sync: re-push failed', e))
