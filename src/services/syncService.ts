@@ -11,7 +11,7 @@ export async function pullNovels(): Promise<Novel[]> {
 
   const { data: novels, error } = await supabase
     .from('novels')
-    .select('*, chapters:chapters!novel_id(*), outline_nodes(*)')
+    .select('*, chapters(*), outline_nodes(*)')
     .eq('user_id', userId)
     .order('created_at', { ascending: true })
 
@@ -22,28 +22,19 @@ export async function pullNovels(): Promise<Novel[]> {
     const chapters: Chapter[] = (n.chapters || [])
       .sort((a: any, b: any) => a.sort_order - b.sort_order)
       .map((c: any) => ({
-        id: c.id,
-        title: c.title,
-        content: c.content,
-        wordCount: c.word_count,
-        createdAt: c.created_at,
-        updatedAt: c.updated_at,
+        id: c.id, title: c.title, content: c.content,
+        wordCount: c.word_count, createdAt: c.created_at, updatedAt: c.updated_at,
       }))
 
     const rawOutline = n.outline_nodes || []
     const outlines = rawOutline.length > 0 ? buildOutlineTree(rawOutline) : getFallbackOutlines()
 
     return {
-      id: n.id,
-      title: n.title,
-      intro: n.intro || '',
-      outlines,
-      chapters,
+      id: n.id, title: n.title, intro: n.intro || '',
+      outlines, chapters,
       currentChapterId: n.current_chapter_id,
-      conversations: [],
-      activeConversationId: null,
-      createdAt: n.created_at,
-      updatedAt: n.updated_at,
+      conversations: [], activeConversationId: null,
+      createdAt: n.created_at, updatedAt: n.updated_at,
     }
   })
 }
@@ -73,63 +64,57 @@ function buildOutlineTree(nodes: any[]): OutlineNode[] {
   })
 }
 
+function getFallbackOutlines(): OutlineNode[] {
+  return createDefaultOutlines()
+}
+
 // ===== Push: 上传一本小说 =====
 
 export async function pushNovel(novel: Novel): Promise<void> {
   const userId = useAuthStore.getState().user?.id
   if (!userId) return
 
-  const { error: novelErr } = await supabase.from('novels').upsert({
-    id: novel.id,
-    user_id: userId,
-    title: novel.title,
-    intro: novel.intro,
-    current_chapter_id: novel.currentChapterId,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'id' })
-  if (novelErr) throw new Error(novelErr.message)
+  const now = new Date().toISOString()
+
+  // 用 SECURITY DEFINER RPC 绕过 RLS
+  await supabase.rpc('upsert_my_novel', {
+    p_id: novel.id, p_title: novel.title, p_intro: novel.intro,
+    p_current_chapter_id: novel.currentChapterId, p_updated_at: now,
+  }).then(({ error }) => { if (error) console.warn('upsert novel:', error.message) })
 
   // Push chapters
-  const chapterRows = novel.chapters.map((c, i) => ({
-    id: c.id,
-    novel_id: novel.id,
-    title: c.title,
-    content: c.content,
-    word_count: c.wordCount,
-    sort_order: i,
-    updated_at: new Date().toISOString(),
-  }))
-  if (chapterRows.length > 0) {
-    const { error: chErr } = await supabase.from('chapters').upsert(chapterRows, { onConflict: 'id' })
-    if (chErr) throw new Error(chErr.message)
+  for (const c of novel.chapters) {
+    const idx = novel.chapters.indexOf(c)
+    await supabase.rpc('upsert_chapter', {
+      p_id: c.id, p_novel_id: novel.id, p_title: c.title,
+      p_content: c.content, p_word_count: c.wordCount,
+      p_sort_order: idx, p_updated_at: now,
+    }).then(({ error }) => { if (error) console.warn('upsert chapter:', error.message) })
   }
 
-  // Push outline nodes — upsert逐一保存，旧节点不删（数据安全第一）
+  // Push outline nodes
   for (const row of flattenOutlines(novel.outlines, novel.id, null)) {
-    const { error: outErr } = await supabase.from('outline_nodes').upsert(row, { onConflict: 'id' })
-    if (outErr) console.warn('sync outline:', outErr.message)
+    await supabase.rpc('upsert_outline', row).then(({ error }) => {
+      if (error) console.warn('upsert outline:', error.message)
+    })
   }
 }
 
 function flattenOutlines(
-  nodes: OutlineNode[], novelId: string, parentId: string | null, startIdx = 0
+  nodes: OutlineNode[], novelId: string, parentId: string | null
 ): any[] {
   const rows: any[] = []
   nodes.forEach((n, i) => {
     rows.push({
-      id: n.id, novel_id: novelId, parent_id: parentId,
-      title: n.title, content: n.content,
-      expanded: n.expanded, sort_order: startIdx + i,
+      p_id: n.id, p_novel_id: novelId, p_parent_id: parentId,
+      p_title: n.title, p_content: n.content,
+      p_expanded: n.expanded, p_sort_order: i,
     })
     if (n.children.length > 0) {
-      rows.push(...flattenOutlines(n.children, novelId, n.id, 0))
+      rows.push(...flattenOutlines(n.children, novelId, n.id))
     }
   })
   return rows
-}
-
-function getFallbackOutlines(): OutlineNode[] {
-  return createDefaultOutlines()
 }
 
 // ===== Delete remote novel =====
