@@ -44,18 +44,34 @@ function persistNovel(get: () => AppState) {
 
 /** Build flat fields from a Novel object. */
 function loadNovelIntoFlat(novel: Novel) {
+  // 兼容旧数据：没有 bookTitleNodeId 时从 outline 中找「书名」
+  let nodeId = novel.bookTitleNodeId
+  if (!nodeId) {
+    nodeId = findBookTitleNodeId(novel.outlines)
+  }
   // Sync novel title into the "书名" outline node (title + content)
-  const outlines = syncTitleToOutline(novel.outlines, novel.title, novel.bookTitleNodeId)
+  const outlines = syncTitleToOutline(novel.outlines, novel.title, nodeId)
   return {
     novelTitle: novel.title,
     novelIntro: novel.intro,
-    bookTitleNodeId: novel.bookTitleNodeId,
+    bookTitleNodeId: nodeId,
     outlines,
     chapters: novel.chapters,
     currentChapterId: novel.currentChapterId,
     conversations: novel.conversations,
     activeConversationId: novel.activeConversationId,
   }
+}
+
+function findBookTitleNodeId(nodes: OutlineNode[]): string {
+  for (const n of nodes) {
+    if (n.title === '书名' && n.children.length === 0) return n.id
+    if (n.children.length > 0) {
+      const found = findBookTitleNodeId(n.children)
+      if (found) return found
+    }
+  }
+  return nodes[0]?.children?.[0]?.id ?? ''
 }
 
 /** Write novel title into the "书名" outline node (both content and title) */

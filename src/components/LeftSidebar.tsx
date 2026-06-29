@@ -150,7 +150,7 @@ function OutlineTree() {
             />
           ) : (
             <span className="flex-1 truncate text-[var(--color-text)]">
-              {node.title === '书名' && novelTitle ? novelTitle : node.title}
+              {(node.id === bookTitleNodeId || node.title === '书名') && novelTitle ? novelTitle : node.title}
             </span>
           )}
 
