@@ -206,12 +206,13 @@ export const useStore = create<AppState>((set, get) => ({
   setAutoObserve: (on) => set({ autoObserve: on }),
 
   setNovelTitle: (title) => {
-    set((state) => ({
-      novelTitle: title,
-      novels: state.novels.map((n) =>
+    set((state) => {
+      const novels = state.novels.map((n) =>
         n.id === state.currentNovelId ? { ...n, title, updatedAt: new Date().toISOString() } : n
-      ),
-    }))
+      )
+      console.log('setNovelTitle:', title, '→ novels[current]:', novels.find(n => n.id === state.currentNovelId)?.title)
+      return { novelTitle: title, novels }
+    })
     persistNovel(get)
   },
   setNovelIntro: (intro) => {

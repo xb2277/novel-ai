@@ -81,6 +81,7 @@ function OutlineTree() {
     if (editTitle.trim()) {
       // 「书名」就是「书名与简介」下面的第一个子节点
       if (isBookTitleNode(id)) {
+        console.log('commitEdit: book title changed to', editTitle.trim())
         setNovelTitle(editTitle.trim())
       }
       updateOutlineNode(id, { title: editTitle.trim() })
