@@ -56,6 +56,7 @@ export interface Novel {
   id: string
   title: string
   intro: string
+  bookTitleNodeId: string  // outline 中「书名」节点的稳定 ID
   outlines: OutlineNode[]
   chapters: Chapter[]
   currentChapterId: string | null
@@ -78,6 +79,7 @@ export function countChinese(text: string): number {
 export interface CurrentNovelView {
   novelTitle: string
   novelIntro: string
+  bookTitleNodeId: string
   outlines: OutlineNode[]
   chapters: Chapter[]
   currentChapterId: string | null

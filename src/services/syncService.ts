@@ -29,8 +29,12 @@ export async function pullNovels(): Promise<Novel[]> {
     const rawOutline = n.outline_nodes || []
     const outlines = rawOutline.length > 0 ? buildOutlineTree(rawOutline) : getFallbackOutlines()
 
+    // Find book title node id (first child of first top-level outline node)
+    const bookTitleNodeId = outlines[0]?.children?.[0]?.id ?? ''
+
     return {
       id: n.id, title: n.title, intro: n.intro || '',
+      bookTitleNodeId,
       outlines, chapters,
       currentChapterId: n.current_chapter_id,
       conversations: [], activeConversationId: null,

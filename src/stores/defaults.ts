@@ -73,11 +73,15 @@ export function createDefaultNovel(title = '未命名作品'): Novel {
   const now = new Date().toISOString()
   const ch1 = createDefaultChapter()
   const conv = createDefaultConversation()
+  const outlines = createDefaultOutlines()
+  // 书名节点是 书名与简介 → 第一个子节点
+  const bookTitleNodeId = outlines[0]?.children?.[0]?.id ?? ''
   return {
     id: uuidv4(),
     title,
     intro: '',
-    outlines: createDefaultOutlines(),
+    bookTitleNodeId,
+    outlines,
     chapters: [ch1],
     currentChapterId: ch1.id,
     conversations: [conv],

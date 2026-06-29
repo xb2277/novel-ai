@@ -44,11 +44,12 @@ function persistNovel(get: () => AppState) {
 
 /** Build flat fields from a Novel object. */
 function loadNovelIntoFlat(novel: Novel) {
-  // Sync novel title into the "书名" outline node content
-  const outlines = syncTitleToOutline(novel.outlines, novel.title)
+  // Sync novel title into the "书名" outline node (title + content)
+  const outlines = syncTitleToOutline(novel.outlines, novel.title, novel.bookTitleNodeId)
   return {
     novelTitle: novel.title,
     novelIntro: novel.intro,
+    bookTitleNodeId: novel.bookTitleNodeId,
     outlines,
     chapters: novel.chapters,
     currentChapterId: novel.currentChapterId,
@@ -57,14 +58,14 @@ function loadNovelIntoFlat(novel: Novel) {
   }
 }
 
-/** Write novel title into the first "书名" outline node */
-function syncTitleToOutline(nodes: OutlineNode[], title: string): OutlineNode[] {
+/** Write novel title into the "书名" outline node (both content and title) */
+function syncTitleToOutline(nodes: OutlineNode[], title: string, nodeId?: string): OutlineNode[] {
   return nodes.map((n) => {
-    if (n.title === '书名' && n.children.length === 0) {
-      return { ...n, content: title }
+    if (n.id === nodeId || (n.title === '书名' && n.children.length === 0)) {
+      return { ...n, title, content: title }
     }
     if (n.children.length > 0) {
-      return { ...n, children: syncTitleToOutline(n.children, title) }
+      return { ...n, children: syncTitleToOutline(n.children, title, nodeId) }
     }
     return n
   })
