@@ -11,7 +11,7 @@ export async function pullNovels(): Promise<Novel[]> {
 
   const { data: novels, error } = await supabase
     .from('novels')
-    .select('*, chapters(*), outline_nodes(*)')
+    .select('*, chapters:chapters!novel_id(*), outline_nodes:outline_nodes!novel_id(*)')
     .eq('user_id', userId)
     .order('created_at', { ascending: true })
 
