@@ -393,12 +393,21 @@ async function pullAndMerge() {
       return
     }
 
-    // Merge: cloud wins, preserve local conversations
+    // Merge: cloud wins for basic info, but preserve richer local data if cloud is empty
     const merged = cloudNovels.map((cn) => {
       const local = localNovels.find((ln) => ln.id === cn.id)
       if (local) {
         cn.conversations = local.conversations
         cn.activeConversationId = local.activeConversationId
+        // If cloud outlines are empty but local has outlines, keep local
+        if (cn.outlines.length === 0 && local.outlines.length > 0) {
+          cn.outlines = local.outlines
+        }
+        // If cloud chapters are empty but local has chapters, keep local
+        if (cn.chapters.length === 0 && local.chapters.length > 0) {
+          cn.chapters = local.chapters
+          cn.currentChapterId = local.currentChapterId
+        }
       }
       return cn
     })
@@ -416,6 +425,10 @@ async function pullAndMerge() {
       } : {}),
     })
     console.log('sync: merged', merged.length, 'novels')
+    // 合并后立即推回云端，补充空数据
+    for (const n of merged) {
+      pushNovel(n).catch((e) => console.warn('sync: re-push failed', e))
+    }
   } catch (e) {
     console.error('sync: pull failed', e)
   }
